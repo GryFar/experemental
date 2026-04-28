@@ -1,0 +1,57 @@
+# ── Python ───────────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.env
+.venv/
+venv/
+
+# ── Логи и скриншоты (создаются скриптом) ────────────────────────────────────────────
+*.log
+logs/
+debug_logs/
+screenshots/
+screens/
+
+# ── Мусорные дебаг-скрины ──────────────────────────────────────────────────────────
+plate_read_fail_*.png
+file_dialog_debug_*.png
+sale/file_dialog_debug_*.png
+sale/_TRASH_*/
+# plate_line_YYYYMMDD_HHMMSS.png — скрины номерных знаков (мусор)
+sale/plate_line_*.png
+# plate_blacklist/*.png — скрины для блеклиста (локальные данные)
+sale/plate_blacklist/
+# item_actions дебаг-скрины
+sale/item_screen_*.png
+sale/monitor_debug_*.png
+sale/screen_debug_*.png
+
+# ── Telegram сессии (никогда не коммитить!) ───────────────────────────────────────
+*.session
+*.tg_tracker.session
+*.session.lock
+rentals_summary.json
+rentals_summary.json.lock
+
+# ── Данные продаж (локальные, не коммитить) ─────────────────────────────────────
+sale/archive.csv
+sale/decisions.csv
+sale/edit_log.csv
+sale/pick_attempts.csv
+sale/pid.txt
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.suo
+*.user
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+/car
