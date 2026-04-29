@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import os
 import time
 from typing import Any, Dict, Optional
@@ -53,7 +54,6 @@ class AdminGate:
         self._attempts = [t for t in self._attempts if now - t <= _ATTEMPT_WINDOW]
         if len(self._attempts) >= _MAX_ATTEMPTS:
             self._locked_until = now + _LOCKOUT_SECONDS
-            self._attempts = []
             return False
 
         salt = str(gate.get("salt") or "")
@@ -61,7 +61,8 @@ class AdminGate:
         if not salt or not expected:
             return False
 
-        if self._hash(salt, candidate) == expected:
+        candidate_hash = self._hash(salt, candidate)
+        if hmac.compare_digest(candidate_hash, expected):
             self._attempts = []
             return True
 

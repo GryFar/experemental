@@ -1,8 +1,12 @@
 import json
 import os
 import re
+import shutil
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Set, Tuple
+
+_MAX_BACKUPS = 20
 
 
 def load_config(path: Path, log_fn: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
@@ -131,6 +135,7 @@ def save_config_preserve(
         _log(f"CONFIG ERROR: key loss detected, abort saving (before={before}, after={after})")
         return False, before, after
 
+    _backup_versioned(path, log_fn=_log)
     _atomic_write(path, merged)
     _log(f"CONFIG: saved ok keys={after} (before={before})")
     return True, before, after
@@ -152,7 +157,35 @@ def detect_keys(cfg: Dict[str, Any]) -> Dict[str, Any]:
 def _atomic_write(path: Path, data: Dict[str, Any]) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        with open(tmp, "r+b") as fh:
+            fh.flush()
+            os.fsync(fh.fileno())
+    except Exception:
+        pass
     os.replace(str(tmp), str(path))
+
+
+def _backup_versioned(path: Path, log_fn=None) -> None:
+    if not path.exists():
+        return
+    try:
+        backup_dir = path.parent / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        dst = backup_dir / f"{path.stem}_{ts}.json"
+        shutil.copy2(str(path), str(dst))
+        existing = sorted(backup_dir.glob(f"{path.stem}_*.json"))
+        for old_file in existing[:-_MAX_BACKUPS]:
+            try:
+                old_file.unlink()
+            except Exception:
+                pass
+        if log_fn:
+            log_fn(f"CONFIG: backup -> {dst.name}")
+    except Exception as e:
+        if log_fn:
+            log_fn(f"CONFIG: backup failed: {e}")
 
 
 def _backup_bad(path: Path, raw: str) -> None:
@@ -177,3 +210,33 @@ def _is_explicit_change(key: str, changed_keys: Optional[Set[str]]) -> bool:
     if not key or not changed_keys:
         return False
     return key in changed_keys
+
+
+# ── Public convenience aliases ──────────────────────────────────────────────────────────────
+
+def load_config_safe(path, defaults=None):
+    """Load config and merge with defaults (existing keys take priority)."""
+    cfg = load_config(path)
+    if defaults:
+        for k, v in defaults.items():
+            if k not in cfg:
+                cfg[k] = v
+    return cfg
+
+
+def backup_config(path):
+    """Create a timestamped backup of the config file. Returns backup Path or None."""
+    from pathlib import Path as _Path
+    import shutil as _shutil, time as _time
+    p = _Path(path)
+    if not p.exists():
+        return None
+    try:
+        backup_dir = p.parent / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        ts = _time.strftime("%Y%m%d_%H%M%S")
+        dst = backup_dir / f"{p.stem}_{ts}.json"
+        _shutil.copy2(str(p), str(dst))
+        return dst
+    except Exception:
+        return None

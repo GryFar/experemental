@@ -92,6 +92,7 @@ class Cleaner(threading.Thread):
 
     # Паттерны имён которые всегда удаляем (мусорные дебаг-скрины)
     JUNK_NAME_PATTERNS = (
+        re.compile(r"^.*\.tmp$",                              re.IGNORECASE),
         re.compile(r"^plate_read_fail_.*\.png$",              re.IGNORECASE),
         re.compile(r"^file_dialog_debug_verify_none_.*\.png$", re.IGNORECASE),
         re.compile(r"^file_dialog_debug_.*\.png$",             re.IGNORECASE),

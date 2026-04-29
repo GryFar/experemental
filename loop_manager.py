@@ -87,6 +87,29 @@ class LoopManager(threading.Thread):
         self._idle_last_log_at = 0.0
         self._visible_fallback_last = 0.0
 
+    # ── Public helpers ─────────────────────────────────────────────────────────
+
+    def is_running(self) -> bool:
+        """True если поток ещё жив."""
+        return self.is_alive()
+
+    def stop_and_join(self, timeout: float = 5.0) -> None:
+        """Аккуратно остановить и дождаться завершения потока."""
+        self.stop_event.set()
+        try:
+            self.run_event.clear()
+        except Exception:
+            pass
+        self.join(timeout=timeout)
+
+    def status(self) -> dict:
+        """Краткий статус состояния менеджера цикла."""
+        return {
+            "alive": self.is_alive(),
+            "stopped": self.stop_event.is_set(),
+            "paused": not self.run_event.is_set(),
+        }
+
     def _wait_if_paused(self):
         while not self.stop_event.is_set() and not self.run_event.is_set():
             time.sleep(0.10)

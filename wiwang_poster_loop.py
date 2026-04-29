@@ -12233,41 +12233,408 @@ def _build_editor_ui(self):
         bg=self.colors["panel"],
     ).pack(anchor="w", padx=10, pady=(0, 10))
 
+# ---------- Pricing AI helpers ----------
+def _normalize_price_input(raw: str) -> str:
+    raw = str(raw or "").strip().replace(" ", "")
+    if not raw:
+        raise ValueError("Пустая цена")
+    cleaned = raw.replace(",", ".")
+    value = float(cleaned)
+    if value <= 0:
+        raise ValueError("Цена должна быть > 0")
+    return f"{value:.0f}"
+
+
+def _safe_trash_dir(base_folder: Path) -> Path:
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    trash = base_folder.parent / f"_TRASH_{stamp}"
+    trash.mkdir(exist_ok=True)
+    return trash
+
+
+def _append_edit_log(stem: str, action: str, detail: str):
+    try:
+        headers = ["timestamp", "stem", "action", "detail"]
+        exists = EDIT_LOG_CSV_PATH.exists()
+        with open(EDIT_LOG_CSV_PATH, "a", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=headers)
+            if not exists:
+                w.writeheader()
+            w.writerow({
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "stem": stem,
+                "action": action,
+                "detail": detail,
+            })
+    except Exception:
+        pass
+
+
 # ---------- Pricing AI (A) UI ----------
 def _build_pricing_ai_ui(self):
-    top = tk.Frame(self.tab_ai, bg=self.colors["panel"])
-    top.pack(fill="x", padx=10, pady=10)
+    colors = self.colors
+    panel = colors["panel"]
+    panel2 = colors.get("panel2", "#0f3460")
+    fg = colors["fg"]
+    muted = colors.get("muted", "#7a7a8e")
+    accent = colors["accent"]
+    warn = colors.get("warning", "#c4903e")
+    succ = colors.get("success", "#4caf7c")
+    danger = colors.get("danger", "#c0544e")
+    border = colors.get("border", "#2a2a4a")
 
-    tk.Label(top, text="Режим A: предложения рассчитаны, но не применяются автоматически.", fg=self.colors["muted"], bg=self.colors["panel"]).pack(side="left")
+    self._ai_nb = ttk.Notebook(self.tab_ai)
+    self._ai_nb.pack(fill="both", expand=True, padx=0, pady=0)
+    tab_manual = tk.Frame(self._ai_nb, bg=panel)
+    tab_sug = tk.Frame(self._ai_nb, bg=panel)
+    self._ai_nb.add(tab_manual, text="💰 Ручные цены")
+    self._ai_nb.add(tab_sug, text="🤖 AI предложения")
 
-    btn_refresh = ttk.Button(top, text="🔄 Обновить предложения", command=self._refresh_suggestions)
-    btn_refresh.pack(side="right", padx=(8, 0))
-    btn_apply_all = ttk.Button(top, text="✅ Применить все", command=self._apply_all_suggestions)
-    btn_apply_all.pack(side="right", padx=(8, 0))
-    Tooltip(btn_apply_all, "Apply all suggestions visible in the list\nUpdates schedule.json and logs the changes.")
+    boost_bar = tk.Frame(tab_manual, bg=panel, highlightthickness=1, highlightbackground=border)
+    boost_bar.pack(fill="x", padx=10, pady=(10, 4))
+    tk.Frame(boost_bar, bg=warn, width=4).pack(side="left", fill="y")
+    tk.Label(boost_bar, text="⚡ Event Boost (глобальный × для всех машин):", fg=warn, bg=panel, font=("Segoe UI", 9, "bold")).pack(side="left", padx=(8, 10))
+    tk.Label(boost_bar, text="Множитель:", fg=muted, bg=panel).pack(side="left")
+    self._boost_var = tk.DoubleVar(value=1.0)
+    self._boost_spin = tk.Spinbox(boost_bar, from_=0.5, to=5.0, increment=0.05, textvariable=self._boost_var, width=7, bg=panel2, fg=fg, relief="flat", buttonbackground=panel2, command=self._on_boost_change)
+    self._boost_spin.pack(side="left", padx=(4, 10))
+    self._boost_spin.bind("<KeyRelease>", lambda _e=None: self._on_boost_change())
+    self._boost_preview_var = tk.StringVar(value="—")
+    tk.Label(boost_bar, text="Preview:", fg=muted, bg=panel).pack(side="left", padx=(4, 4))
+    tk.Label(boost_bar, textvariable=self._boost_preview_var, fg=warn, bg=panel, font=("Segoe UI", 9, "bold"), width=22, anchor="w").pack(side="left")
+    tk.Button(boost_bar, text="↺ Сброс", bg=panel2, fg=muted, activebackground=border, activeforeground=fg, relief="flat", bd=0, padx=8, pady=3, font=("Segoe UI", 9), command=self._reset_event_boost).pack(side="right", padx=(0, 4))
+    tk.Button(boost_bar, text="✅ Применить Event Boost", bg=warn, fg=colors["bg"], activebackground="#a07030", activeforeground=colors["bg"], relief="flat", bd=0, padx=10, pady=3, font=("Segoe UI", 9, "bold"), command=self._apply_event_boost).pack(side="right", padx=(0, 4))
 
-    cols = ("vehicle", "daytype", "slot", "cur", "suggest", "delta", "why")
-    self.sug_tree = ttk.Treeview(self.tab_ai, columns=cols, show="headings", height=8)
-    for c, title, w in [
-        ("vehicle", "Vehicle", 200),
-        ("daytype", "Day", 80),
-        ("slot", "Slot", 70),
-        ("cur", "Cur×", 70),
-        ("suggest", "Sug×", 70),
-        ("delta", "Δ%", 60),
-        ("why", "Reason", 420),
-    ]:
+    toolbar = tk.Frame(tab_manual, bg=panel)
+    toolbar.pack(fill="x", padx=10, pady=(4, 4))
+    ttk.Button(toolbar, text="🔄 Обновить", command=self._refresh_manual_prices).pack(side="left")
+    tk.Label(toolbar, text="Поиск:", fg=muted, bg=panel).pack(side="left", padx=(12, 4))
+    self._manual_search_var = tk.StringVar()
+    ent = ttk.Entry(toolbar, textvariable=self._manual_search_var, width=20)
+    ent.pack(side="left")
+    ent.bind("<KeyRelease>", lambda _e=None: self._refresh_manual_prices())
+
+    tbl_frame = tk.Frame(tab_manual, bg=panel)
+    tbl_frame.pack(fill="both", expand=True, padx=10, pady=(0, 4))
+    mcols = ("vehicle","base_price","boost_preview","mode","weekday_low","weekday_gold","weekend_low","weekend_gold")
+    self._manual_tree = ttk.Treeview(tbl_frame, columns=mcols, show="headings", height=12, selectmode="browse")
+    mvsb = ttk.Scrollbar(tbl_frame, orient="vertical", command=self._manual_tree.yview)
+    mhsb = ttk.Scrollbar(tbl_frame, orient="horizontal", command=self._manual_tree.xview)
+    self._manual_tree.configure(yscrollcommand=mvsb.set, xscrollcommand=mhsb.set)
+    self._manual_tree.grid(row=0, column=0, sticky="nsew")
+    mvsb.grid(row=0, column=1, sticky="ns")
+    mhsb.grid(row=1, column=0, sticky="ew")
+    tbl_frame.rowconfigure(0, weight=1)
+    tbl_frame.columnconfigure(0, weight=1)
+    for col, title, width, anchor in [("vehicle","Машина",200,"w"),("base_price","Базовая цена",110,"e"),("boost_preview","⚡ Preview цена",120,"e"),("mode","Режим",80,"center"),("weekday_low","Будни low×",80,"center"),("weekday_gold","Будни gold×",80,"center"),("weekend_low","Выход. low×",80,"center"),("weekend_gold","Выход. gold×",80,"center")]:
+        self._manual_tree.heading(col, text=title, command=lambda c=col: self._sort_manual_tree(c))
+        self._manual_tree.column(col, width=width, anchor=anchor)
+    self._manual_tree.tag_configure("boosted", background="#2a2208", foreground=warn)
+    self._manual_tree.tag_configure("oddrow", background=panel2)
+    self._manual_tree.tag_configure("evenrow", background=panel)
+    self._manual_tree.bind("<<TreeviewSelect>>", self._on_manual_price_select)
+    self._manual_tree.bind("<Double-1>", lambda _e=None: self._edit_manual_price_inline())
+
+    edit_row = tk.Frame(tab_manual, bg=panel, highlightthickness=1, highlightbackground=border)
+    edit_row.pack(fill="x", padx=10, pady=(0, 4))
+    tk.Label(edit_row, text="✏ Быстрое изменение:", fg=muted, bg=panel, font=("Segoe UI", 9, "bold")).pack(side="left", padx=(8, 8))
+    tk.Label(edit_row, text="Машина:", fg=muted, bg=panel).pack(side="left")
+    self._manual_sel_name_var = tk.StringVar(value="—")
+    tk.Label(edit_row, textvariable=self._manual_sel_name_var, fg=fg, bg=panel, width=20, anchor="w", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(4, 10))
+    tk.Label(edit_row, text="Новая цена:", fg=muted, bg=panel).pack(side="left")
+    self._manual_new_price_var = tk.StringVar()
+    self._manual_price_entry = ttk.Entry(edit_row, textvariable=self._manual_new_price_var, width=12)
+    self._manual_price_entry.pack(side="left", padx=(4, 6))
+    self._manual_price_entry.bind("<Return>", lambda _e=None: self._save_manual_price_quick())
+    tk.Button(edit_row, text="💾 Сохранить", bg=accent, fg=colors["bg"], activebackground=colors.get("accent2", "#5b8a72"), relief="flat", bd=0, padx=10, pady=3, font=("Segoe UI", 9, "bold"), command=self._save_manual_price_quick).pack(side="left", padx=(0, 8))
+    self._manual_save_status_var = tk.StringVar(value="")
+    tk.Label(edit_row, textvariable=self._manual_save_status_var, fg=succ, bg=panel, font=("Segoe UI", 9)).pack(side="left")
+    self._manual_status_var = tk.StringVar(value="Загрузка...")
+    tk.Label(tab_manual, textvariable=self._manual_status_var, fg=muted, bg=panel, font=("Segoe UI", 8), anchor="w").pack(fill="x", padx=10, pady=(0, 4))
+
+    ai_top = tk.Frame(tab_sug, bg=panel)
+    ai_top.pack(fill="x", padx=10, pady=10)
+    tk.Label(ai_top, text="Режим A: предложения по archive.csv. Работает только для машин в режиме schedule/auto_suggest.", fg=muted, bg=panel).pack(side="left")
+    ttk.Button(ai_top, text="🔄 Обновить предложения", command=self._refresh_suggestions).pack(side="right", padx=(8, 0))
+    ttk.Button(ai_top, text="✅ Применить все", command=self._apply_all_suggestions).pack(side="right", padx=(8, 0))
+    sug_frame = tk.Frame(tab_sug, bg=panel)
+    sug_frame.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+    cols = ("vehicle","daytype","slot","cur","suggest","delta","why")
+    self.sug_tree = ttk.Treeview(sug_frame, columns=cols, show="headings", height=10)
+    sug_vsb = ttk.Scrollbar(sug_frame, orient="vertical", command=self.sug_tree.yview)
+    self.sug_tree.configure(yscrollcommand=sug_vsb.set)
+    self.sug_tree.pack(side="left", fill="both", expand=True)
+    sug_vsb.pack(side="left", fill="y")
+    for c, title, w in [("vehicle","Машина",200),("daytype","День",80),("slot","Слот",70),("cur","Тек.×",70),("suggest","Пред.×",70),("delta","Δ%",60),("why","Причина",380)]:
         self.sug_tree.heading(c, text=title)
         self.sug_tree.column(c, width=w, anchor="w")
-    self.sug_tree.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-    Tooltip(self.sug_tree, "Double-click a row to apply that one suggestion.\nComputed from archive.csv using MSK slots\nand your Score weight slider.")
-
+    self.sug_tree.tag_configure("up", foreground=succ)
+    self.sug_tree.tag_configure("down", foreground=danger)
     self.sug_tree.bind("<Double-1>", lambda _e=None: self._apply_selected_suggestion())
+    ai_bottom = tk.Frame(tab_sug, bg=panel)
+    ai_bottom.pack(fill="x", padx=10, pady=(0, 8))
+    ttk.Button(ai_bottom, text="✅ Применить выбранные", command=self._apply_selected_suggestion).pack(side="left")
+    ttk.Button(ai_bottom, text="📤 Экспорт CSV", command=self._export_suggestions_csv).pack(side="left", padx=(10, 0))
+    self._sug_count_var = tk.StringVar(value="")
+    tk.Label(ai_bottom, textvariable=self._sug_count_var, fg=muted, bg=panel, font=("Segoe UI", 9)).pack(side="left", padx=(16, 0))
+    try:
+        self.tab_ai.after(200, self._refresh_manual_prices)
+    except Exception:
+        pass
 
-    bottom = tk.Frame(self.tab_ai, bg=self.colors["panel"])
-    bottom.pack(fill="x", padx=10, pady=(0, 10))
-    ttk.Button(bottom, text="✅ Применить выбранные", command=self._apply_selected_suggestion).pack(side="left")
-    ttk.Button(bottom, text="📤 Экспорт", command=self._export_suggestions_csv).pack(side="left", padx=(10, 0))
+
+def _get_all_vehicles(self) -> list:
+    veh = []
+    try:
+        for iid in self.tree.get_children():
+            try:
+                veh.append(self.tree.item(iid, "values")[0])
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return veh
+
+
+def _refresh_manual_prices(self):
+    if not hasattr(self, "_manual_tree"):
+        return
+    query = ""
+    try:
+        query = self._manual_search_var.get().strip().lower()
+    except Exception:
+        pass
+    boost = 1.0
+    try:
+        boost = float(self._boost_var.get())
+        if boost <= 0:
+            boost = 1.0
+    except Exception:
+        boost = 1.0
+    vehicles = self._get_all_vehicles()
+    rows = []
+    for stem in vehicles:
+        if query and query not in stem.lower():
+            continue
+        try:
+            folder = item_folder(self.cfg_provider(), stem)
+            if not folder.exists():
+                continue
+            base_raw = (read_text(folder, "price") or "").strip()
+            try:
+                base_f = float(base_raw)
+            except Exception:
+                base_f = None
+            sched = load_schedule(folder)
+            mode = str(sched.get("mode", "manual"))
+            wd = sched.get("weekday", {})
+            we = sched.get("weekend", {})
+            rows.append({"stem": stem, "base_raw": base_raw, "base_f": base_f, "mode": mode, "wd_low": wd.get("low", 1.0), "wd_gold": wd.get("gold", 1.0), "we_low": we.get("low", 1.0), "we_gold": we.get("gold", 1.0)})
+        except Exception:
+            pass
+    self._manual_tree.delete(*self._manual_tree.get_children())
+    boosted_count = 0
+    for idx, r in enumerate(rows):
+        base_f = r["base_f"]
+        if base_f is not None and boost != 1.0:
+            preview = f"{base_f * boost:,.0f}"
+            boosted_count += 1
+            tag = "boosted"
+        elif base_f is not None:
+            preview = f"{base_f:,.0f}"
+            tag = "oddrow" if idx % 2 else "evenrow"
+        else:
+            preview = "—"
+            tag = "oddrow" if idx % 2 else "evenrow"
+        self._manual_tree.insert("", "end", iid=r["stem"], values=(r["stem"], r["base_raw"] or "—", preview, r["mode"], f"{float(r['wd_low']):.2f}", f"{float(r['wd_gold']):.2f}", f"{float(r['we_low']):.2f}", f"{float(r['we_gold']):.2f}"), tags=(tag,))
+    try:
+        self._boost_preview_var.set(f"×{boost:.2f} применится к {boosted_count} машинам" if boost != 1.0 else "×1.00 — изменений нет")
+        status = f"Машин: {len(rows)}"
+        if query:
+            status += f"  (фильтр: «{query}»)"
+        if boost != 1.0:
+            status += f"  |  ⚡ Boost ×{boost:.2f} активен"
+        self._manual_status_var.set(status)
+    except Exception:
+        pass
+
+
+def _sort_manual_tree(self, col: str):
+    if not hasattr(self, "_manual_tree"):
+        return
+    if not hasattr(self, "_manual_sort_state"):
+        self._manual_sort_state = {}
+    asc = not self._manual_sort_state.get(col, False)
+    self._manual_sort_state[col] = asc
+    items = [(self._manual_tree.set(iid, col), iid) for iid in self._manual_tree.get_children()]
+    try:
+        items.sort(key=lambda x: float(x[0].replace(",", "").replace("—", "0")), reverse=not asc)
+    except Exception:
+        items.sort(key=lambda x: x[0].lower(), reverse=not asc)
+    for idx, (_, iid) in enumerate(items):
+        tag = "boosted" if "boosted" in self._manual_tree.item(iid, "tags") else ("oddrow" if idx % 2 else "evenrow")
+        self._manual_tree.move(iid, "", idx)
+        self._manual_tree.item(iid, tags=(tag,))
+
+
+def _on_manual_price_select(self, _event=None):
+    if not hasattr(self, "_manual_tree"):
+        return
+    sel = self._manual_tree.selection()
+    if not sel:
+        return
+    vals = self._manual_tree.item(sel[0], "values")
+    self._manual_sel_name_var.set(vals[0])
+    self._manual_new_price_var.set(vals[1] if vals[1] != "—" else "")
+    try:
+        self._manual_save_status_var.set("")
+    except Exception:
+        pass
+
+
+def _edit_manual_price_inline(self):
+    if not hasattr(self, "_manual_tree"):
+        return
+    self._on_manual_price_select()
+    try:
+        self._manual_price_entry.focus_set()
+        self._manual_price_entry.select_range(0, "end")
+    except Exception:
+        pass
+
+
+def _save_manual_price_quick(self):
+    if not hasattr(self, "_manual_tree"):
+        return
+    stem = ""
+    try:
+        stem = self._manual_sel_name_var.get().strip()
+    except Exception:
+        pass
+    if not stem or stem == "—":
+        messagebox.showinfo("Выбор машины", "Выбери машину в таблице.")
+        return
+    raw = ""
+    try:
+        raw = self._manual_new_price_var.get().strip()
+    except Exception:
+        pass
+    if not raw:
+        messagebox.showwarning("Ошибка", "Введи новую цену.")
+        return
+    try:
+        normalized = _normalize_price_input(raw)
+    except Exception as e:
+        messagebox.showerror("Неверная цена", str(e))
+        return
+    try:
+        folder = item_folder(self.cfg_provider(), stem)
+        folder.mkdir(parents=True, exist_ok=True)
+        p = folder / "price.txt"
+        try:
+            if p.exists():
+                trash = _safe_trash_dir(folder)
+                shutil.copy2(p, trash / f"{stem}__price.txt")
+        except Exception:
+            pass
+        p.write_text(normalized, encoding="utf-8")
+        _append_edit_log(stem, "manual_price_quick", f"price={normalized}")
+        log(f"MANUAL PRICE: {stem} -> {normalized}")
+        try:
+            self._manual_new_price_var.set(normalized)
+            self._manual_save_status_var.set(f"✅ {stem} = {normalized}")
+            # Auto-clear status after 3 seconds
+            try:
+                self.tab_ai.after(3000, lambda: self._manual_save_status_var.set(""))
+            except Exception:
+                pass
+        except Exception:
+            pass
+        self._refresh_manual_prices()
+        try:
+            if self._selected_vehicle() == stem:
+                self._load_editor_from_files()
+        except Exception:
+            pass
+    except Exception as e:
+        messagebox.showerror("Ошибка сохранения", str(e))
+
+
+def _on_boost_change(self, _event=None):
+    try:
+        self._refresh_manual_prices()
+    except Exception:
+        pass
+
+
+def _apply_event_boost(self):
+    boost = 1.0
+    try:
+        boost = float(self._boost_var.get())
+    except Exception:
+        messagebox.showerror("Ошибка", "Неверный множитель.")
+        return
+    if boost <= 0:
+        messagebox.showerror("Ошибка", "Множитель должен быть больше 0.")
+        return
+    if boost == 1.0:
+        messagebox.showinfo("Event Boost", "Множитель ×1.0 — изменений нет.")
+        return
+    vehicles = self._get_all_vehicles()
+    if not vehicles:
+        messagebox.showinfo("Event Boost", "Нет машин в списке.")
+        return
+    count = 0
+    skipped = 0
+    errors = []
+    for stem in vehicles:
+        try:
+            folder = item_folder(self.cfg_provider(), stem)
+            folder.mkdir(parents=True, exist_ok=True)
+            p = folder / "price.txt"
+            base_raw = (p.read_text(encoding="utf-8").strip() if p.exists() else "")
+            if not base_raw:
+                skipped += 1
+                continue
+            try:
+                base_norm = _normalize_price_input(base_raw)
+                base_f = float(base_norm)
+            except Exception:
+                skipped += 1
+                continue
+            new_raw = f"{base_f * boost:.0f}"
+            try:
+                if p.exists():
+                    trash = _safe_trash_dir(folder)
+                    shutil.copy2(p, trash / f"{stem}__price_boost.txt")
+            except Exception:
+                pass
+            p.write_text(new_raw, encoding="utf-8")
+            _append_edit_log(stem, "event_boost", f"boost={boost:.2f} old={base_norm} new={new_raw}")
+            count += 1
+        except Exception as e:
+            errors.append(f"{stem}: {e}")
+    log(f"EVENT BOOST: ×{boost:.2f} applied to {count} vehicles, skipped={skipped}")
+    msg = f"Event Boost ×{boost:.2f} применён к {count} машинам."
+    if skipped:
+        msg += f"\nПропущено: {skipped} (пустая/битая цена)"
+    if errors:
+        msg += f"\n\nОшибки ({len(errors)}):\n" + "\n".join(errors[:5])
+    messagebox.showinfo("Event Boost применён", msg)
+    self._reset_event_boost()
+    self._refresh_manual_prices()
+    try:
+        self._refresh_stats(force=False)
+    except Exception:
+        pass
+
+
+def _reset_event_boost(self):
+    try:
+        self._boost_var.set(1.0)
+        self._on_boost_change()
+    except Exception:
+        pass
 
 
 # ---------- Editor logic ----------
@@ -12591,6 +12958,7 @@ def _refresh_suggestions(self):
         except Exception:
             pass
     for r in rows:
+        tag = "up" if r["delta"] > 0 else "down"
         self.sug_tree.insert("", "end", values=(
             r["vehicle"],
             r["daytype"],
@@ -12599,7 +12967,14 @@ def _refresh_suggestions(self):
             f"{r['suggest']:.2f}",
             f"{r['delta']:+.0f}%",
             r["why"],
-        ))
+        ), tags=(tag,))
+    try:
+        if rows:
+            self._sug_count_var.set(f"Предложений: {len(rows)}")
+        else:
+            self._sug_count_var.set("Нет предложений — убедитесь что режим schedule/auto_suggest включён у машин")
+    except Exception:
+        pass
 
     try:
         headers = ["timestamp", "vehicle", "daytype", "slot", "cur", "suggest", "delta", "why"]
@@ -12616,14 +12991,24 @@ def _refresh_suggestions(self):
 def _apply_selected_suggestion(self):
     sel = self.sug_tree.selection()
     if not sel:
+        messagebox.showinfo("AI предложения", "Выбери строку в таблице предложений.")
         return
-    vals = self.sug_tree.item(sel[0], "values")
-    stem, daytype, slot, sug = vals[0], vals[1], vals[2], float(vals[4])
-    self._apply_one_suggestion(stem, daytype, slot, sug)
+    try:
+        vals = self.sug_tree.item(sel[0], "values")
+        stem, daytype, slot, sug = vals[0], vals[1], vals[2], float(vals[4])
+        self._apply_one_suggestion(stem, daytype, slot, sug)
+        try:
+            self._refresh_suggestions()
+        except Exception:
+            pass
+    except Exception as e:
+        messagebox.showerror("Ошибка применения", str(e))
 
 def _apply_all_suggestions(self):
     # Tree can refresh while applying; protect against "Item not found"
     iids = list(self.sug_tree.get_children())
+    count = 0
+    errors = []
     for iid in iids:
         try:
             vals = self.sug_tree.item(iid, "values")
@@ -12633,47 +13018,64 @@ def _apply_all_suggestions(self):
             stem, daytype, slot, sug = vals[0], vals[1], vals[2], float(vals[4])
         except Exception:
             continue
-        self._apply_one_suggestion(stem, daytype, slot, sug)
+        try:
+            self._apply_one_suggestion(stem, daytype, slot, sug)
+            count += 1
+        except Exception as e:
+            errors.append(f"{vals[0] if vals else '?'}: {e}")
+    msg = f"Применено предложений: {count}"
+    if errors:
+        msg += f"\nОшибки ({len(errors)}):\n" + "\n".join(errors[:5])
+    messagebox.showinfo("AI предложения применены", msg)
+    try:
+        self._refresh_suggestions()
+    except Exception:
+        pass
 
 def _apply_one_suggestion(self, stem: str, daytype: str, slot: str, sug: float):
     folder = item_folder(self.cfg_provider(), stem)
+    folder.mkdir(parents=True, exist_ok=True)
     sched = load_schedule(folder)
     try:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        trash = folder.parent / f"_TRASH_{stamp}"
-        trash.mkdir(exist_ok=True)
         p = folder / "schedule.json"
         if p.exists():
+            trash = _safe_trash_dir(folder)
             shutil.copy2(p, trash / f"{stem}__schedule.json")
     except Exception:
         pass
 
     cur = float(sched.get(daytype, {}).get(slot, 1.0))
-    sched.setdefault(daytype, {})[slot] = float(sug)
+    safe_sug = max(0.01, float(sug))
+    sched.setdefault(daytype, {})[slot] = safe_sug
     save_schedule(folder, sched)
+    _append_edit_log(stem, "apply_suggestion", f"{daytype}/{slot}: {cur:.2f} -> {safe_sug:.2f}")
 
-    try:
-        headers = ["timestamp", "stem", "action", "detail"]
-        exists = EDIT_LOG_CSV_PATH.exists()
-        with open(EDIT_LOG_CSV_PATH, "a", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=headers)
-            if not exists:
-                w.writeheader()
-            w.writerow({
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "stem": stem,
-                "action": "apply_suggestion",
-                "detail": f"{daytype}/{slot}: {cur:.2f} -> {sug:.2f}",
-            })
-    except Exception:
-        pass
-
-    log(f"AI(A): applied suggestion {stem} {daytype}/{slot} {cur:.2f}->{sug:.2f}")
+    log(f"AI(A): applied suggestion {stem} {daytype}/{slot} {cur:.2f}->{safe_sug:.2f}")
     self._load_editor_from_files()
     self._refresh_stats(force=False)
 
+
 def _export_suggestions_csv(self):
-    messagebox.showinfo("Info", f"Suggestions file:\\n{PRICE_SUGGESTIONS_CSV_PATH}")
+    """Копирует файл предложений в выбранное пользователем место."""
+    try:
+        from tkinter import filedialog
+        src = PRICE_SUGGESTIONS_CSV_PATH
+        if not src.exists():
+            messagebox.showwarning("Экспорт", f"Файл предложений не найден:\n{src}")
+            return
+        dst = filedialog.asksaveasfilename(
+            title="Экспорт предложений AI",
+            defaultextension=".csv",
+            filetypes=[("CSV файлы", "*.csv"), ("Все файлы", "*.*")],
+            initialfile=f"ai_suggestions_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+        )
+        if not dst:
+            return
+        import shutil as _shutil
+        _shutil.copy2(src, dst)
+        messagebox.showinfo("Экспорт", f"Предложения сохранены:\n{dst}")
+    except Exception as e:
+        messagebox.showerror("Ошибка экспорта", str(e))
 
 # ---------- Inline charts ----------
 def _redraw_inline_charts(self):

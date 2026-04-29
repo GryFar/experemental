@@ -23,18 +23,33 @@ class TgService:
         return tg_rent_tracker.get_status()
 
     def records(self) -> List[Dict[str, Any]]:
-        summary_path = tg_rent_tracker._summary_path()
-        current_signature: Optional[Tuple[int, int]]
-        try:
-            stat_result = summary_path.stat()
-            current_signature = (stat_result.st_mtime_ns, stat_result.st_size)
-        except Exception:
-            current_signature = None
-
-        if self._records_signature == current_signature:
+        summary_path = None
+        get_path_fn = getattr(tg_rent_tracker, "get_summary_path", None)
+        if callable(get_path_fn):
+            try:
+                summary_path = get_path_fn()
+            except Exception:
+                pass
+        if summary_path is None:
+            private_fn = getattr(tg_rent_tracker, "_summary_path", None)
+            if callable(private_fn):
+                try:
+                    summary_path = private_fn()
+                except Exception:
+                    pass
+        current_signature = None
+        if summary_path is not None:
+            try:
+                st = summary_path.stat()
+                current_signature = (st.st_mtime_ns, st.st_size)
+            except Exception:
+                pass
+        if current_signature is not None and self._records_signature == current_signature:
             return list(self._records_cache)
-
-        records = tg_rent_tracker.load_records()
+        try:
+            records = tg_rent_tracker.load_records()
+        except Exception:
+            records = []
         self._records_cache = list(records)
         self._records_signature = current_signature
         return records

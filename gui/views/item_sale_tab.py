@@ -794,6 +794,7 @@ class ItemSaleTab(ttk.Frame):
         items: List[Dict] = cfg.get("tracked_items", [])
         cfg["tracked_items"] = [it for it in items if it.get("name") != name]
         self._cfg_saver(cfg)
+        self._item_stats.pop(name, None)
         self._refresh_table()
         self._log(f"[GUI] Удалён {name}")
 

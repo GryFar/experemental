@@ -194,6 +194,9 @@ class ItemSaleMonitor:
     def is_alive(self) -> bool:
         return bool(self._thread and self._thread.is_alive())
 
+    def is_running(self) -> bool:
+        return self.is_alive()
+
     def get_stats(self) -> dict:
         """Возвращает статистику работы монитора."""
         return {

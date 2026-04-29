@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 from gui.auth.admin_gate import AdminGate
 from gui.persistence.ui_prefs import load_ui_prefs, save_ui_prefs
@@ -35,7 +35,22 @@ class AppGUI:
         self.root = root
         self.cfg_provider = cfg_provider
         self.cfg_save = cfg_save
-        self.log = log_fn
+        self._log_lines: list = []
+        _orig_log = log_fn
+
+        def _wrapped_log(msg: str) -> None:
+            try:
+                _orig_log(msg)
+            except Exception:
+                pass
+            try:
+                self._log_lines.append(msg)
+                if len(self._log_lines) > 500:
+                    self._log_lines = self._log_lines[-500:]
+            except Exception:
+                pass
+
+        self.log = _wrapped_log
         self.colors = colors
 
         self.state = AppState()
@@ -75,8 +90,23 @@ class AppGUI:
         self._schedule_refresh()
         # Сохраняем геометрию при любом изменении размера/положения окна
         self.root.bind("<Configure>", lambda e: self._schedule_prefs_save())
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ═══════════════════════════ UI BUILD ═════════════════════════════════════════
+
+    def _on_close(self) -> None:
+        for attr in ("_refresh_job", "_prefs_save_job"):
+            try:
+                job = getattr(self, attr, None)
+                if job is not None:
+                    self.root.after_cancel(job)
+                    setattr(self, attr, None)
+            except Exception:
+                pass
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
 
     def _build_ui(self) -> None:
         self.root.configure(bg=self.colors["bg"])
@@ -344,28 +374,91 @@ class AppGUI:
     # ═══════════════════════════ DATA REFRESH ═════════════════════════════════════════
 
     def _schedule_refresh(self, interval_ms: int = 15_000) -> None:
-        self._refresh_job = self.root.after(interval_ms, self._auto_refresh)
+        try:
+            if getattr(self, "_refresh_job", None) is not None:
+                self.root.after_cancel(self._refresh_job)
+                self._refresh_job = None
+        except Exception:
+            pass
+        try:
+            self._refresh_job = self.root.after(interval_ms, self._auto_refresh)
+        except Exception:
+            pass
 
     def _auto_refresh(self) -> None:
-        self._do_refresh()
-        self._schedule_refresh()
+        self._refresh_job = None
+        try:
+            self._do_refresh()
+            self._schedule_refresh()
+        except Exception as exc:
+            self.log(f"[GUI] _auto_refresh crashed: {exc}")
+            self._schedule_refresh(30_000)  # backoff to 30s on error
 
     def _manual_refresh(self) -> None:
         self._do_refresh()
 
     def _do_refresh(self) -> None:
         try:
-            # Получаем снапшот из AppState (события + ошибки)
-            snapshot = self.state.get_snapshot()
-            events  = snapshot.get("events", [])
-            errors  = snapshot.get("errors", [])
-            now_ts  = time.time()
-
-            # Подгружаем свежие события из TG-сервиса в AppState
+            now_ts = time.time()
             try:
                 new_events = self.tg_service.poll()
                 if new_events:
                     self.state.add_events(new_events)
+            except Exception:
+                pass
+
+            snapshot = self.state.get_snapshot()
+            events = snapshot.get("events", [])
+            errors = snapshot.get("errors", [])
+
+            try:
+                records = self.tg_service.records()
+                metrics = compute_metrics(records, now_ts)
+                ec = compute_error_counts(errors, now_ts)
+                tg_status = self.tg_service.status()
+                _last_ts = tg_status.get("last_message_ts") or 0
+                try:
+                    _age_sec = int(now_ts - float(_last_ts)) if _last_ts else None
+                    if _age_sec is None:
+                        _age_str = "—"
+                    elif _age_sec < 60:
+                        _age_str = f"{_age_sec}s"
+                    elif _age_sec < 3600:
+                        _age_str = f"{_age_sec // 60}m"
+                    else:
+                        _age_str = f"{_age_sec // 3600}h {(_age_sec % 3600) // 60}m"
+                except Exception:
+                    _age_str = "—"
+                self._tg_dashboard.update_cards({
+                    "today": metrics.get("totals", {}).get("today", 0),
+                    "week": metrics.get("totals", {}).get("week", 0),
+                    "month": metrics.get("totals", {}).get("month", 0),
+                    "active": metrics.get("active", 0),
+                    "avg_rate": metrics.get("avg_rate", 0),
+                    "top_vehicle": metrics.get("top_vehicle", "—"),
+                    "errors": f"{ec.get('10m',0)}/{ec.get('1h',0)}",
+                    "last_msg_age": _age_str,
+                })
+                self._tg_dashboard.update_rentals(records[-50:])
+                veh = metrics.get("by_vehicle", {})
+                self._tg_dashboard.update_vehicles([{
+                    "vehicle": k,
+                    "plate": v.get("plate", ""),
+                    "income_7d": v.get("income_7d", 0),
+                    "income_30d": v.get("income_30d", 0),
+                    "total_income": v.get("income_total", 0),
+                    "avg_rate": round(v.get("income_total", 0) / max(v.get("hours", 1), 0.01), 1),
+                    "count": v.get("count", 0),
+                } for k, v in sorted(veh.items(), key=lambda x: x[1].get("income_total", 0), reverse=True)])
+                try:
+                    self._tg_dashboard.pulse()
+                except Exception:
+                    pass
+                try:
+                    log_lines = getattr(self, "_log_lines", [])
+                    self._tg_dashboard.update_logs(log_lines[-200:])
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -572,4 +665,7 @@ class AppGUI:
     # ═══════════════════════════ STATUS ══════════════════════════════════════════════
 
     def _update_status(self, msg: str) -> None:
-        self._status_lbl.config(text=msg)
+        try:
+            self._status_lbl.config(text=msg)
+        except Exception:
+            pass
