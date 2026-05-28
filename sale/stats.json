@@ -1,0 +1,229 @@
+{
+  "updated_at": "2026-05-28 02:53:34",
+  "total_posts": 4767,
+  "total_revenue": 39313182.05,
+  "items": {
+    "Brottora": {
+      "posts": 266,
+      "revenue": 1779682.0,
+      "last_price": 7899.0,
+      "last_posted_at": "2026-05-27 19:39:07",
+      "tg_events": 76,
+      "tg_revenue": 471813,
+      "tg_hours": 87,
+      "tg_last_renter": "Robert Collier",
+      "tg_last_plate": "4TVT",
+      "tg_last_car_raw": "[RL] Pegassi Brutora"
+    },
+    "Shiron": {
+      "posts": 213,
+      "revenue": 2736782.0,
+      "last_price": 11400.0,
+      "last_posted_at": "2026-04-26 19:54:19",
+      "tg_events": 121,
+      "tg_revenue": 1843672,
+      "tg_hours": 142,
+      "tg_last_renter": "Maga Rain",
+      "tg_last_plate": "0ODL",
+      "tg_last_car_raw": "[RL] Truffade Shiron"
+    },
+    "Vert": {
+      "posts": 72,
+      "revenue": 1052628.0,
+      "last_price": 14299.0,
+      "last_posted_at": "2026-01-18 09:23:50",
+      "tg_events": 137,
+      "tg_revenue": 2561401,
+      "tg_hours": 179,
+      "tg_last_renter": "Kartavi Washingtonez",
+      "tg_last_plate": "9YQY524",
+      "tg_last_car_raw": "Buckingham Volatus S"
+    },
+    "6x6": {
+      "posts": 205,
+      "revenue": 2340589.0,
+      "last_price": 7999.0,
+      "last_posted_at": "2026-05-27 19:36:26",
+      "tg_events": 35,
+      "tg_revenue": 637042,
+      "tg_hours": 47,
+      "tg_last_renter": "Ksenia Relevant",
+      "tg_last_plate": "7QVQ",
+      "tg_last_car_raw": "[RL] Benefactor G-Class W463 6x6"
+    },
+    "I8": {
+      "posts": 185,
+      "revenue": 939452.0,
+      "last_price": 4796.0,
+      "last_posted_at": "2026-05-26 23:32:47",
+      "tg_events": 16,
+      "tg_revenue": 105604,
+      "tg_hours": 17,
+      "tg_last_renter": "Mark Karma",
+      "tg_last_plate": "5HRX253",
+      "tg_last_car_raw": "[RL] Ubermacht i8"
+    },
+    "Cart": {
+      "posts": 221,
+      "revenue": 981771.0,
+      "last_price": 4999.0,
+      "last_posted_at": "2026-05-27 19:40:28",
+      "tg_events": 8,
+      "tg_revenue": 42502,
+      "tg_hours": 9,
+      "tg_last_renter": "Alex Razer",
+      "tg_last_plate": "2DVC663",
+      "tg_last_car_raw": "Dinka Veto Classic"
+    },
+    "Raptor": {
+      "posts": 234,
+      "revenue": 1470429.0,
+      "last_price": 5999.0,
+      "last_posted_at": "2026-05-27 20:03:54",
+      "tg_events": 66,
+      "tg_revenue": 720524,
+      "tg_hours": 112,
+      "tg_last_renter": "Natali Seth",
+      "tg_last_plate": "4HEQ",
+      "tg_last_car_raw": "[RL] Vapid F-150 Predator"
+    },
+    "Ram": {
+      "posts": 314,
+      "revenue": 1754036.0,
+      "last_price": 5999.0,
+      "last_posted_at": "2026-05-27 20:02:33",
+      "tg_events": 27,
+      "tg_revenue": 222375,
+      "tg_hours": 43,
+      "tg_last_renter": "Wex Ksai",
+      "tg_last_plate": "3WXK",
+      "tg_last_car_raw": "[RL] Bravado RUM 1500"
+    },
+    "Betly": {
+      "posts": 245,
+      "revenue": 1362287.0,
+      "last_price": 5980.0,
+      "last_posted_at": "2026-05-27 19:37:46",
+      "tg_events": 70,
+      "tg_revenue": 465792,
+      "tg_hours": 89,
+      "tg_last_renter": "Mitya Kolupaev",
+      "tg_last_plate": "7ALK",
+      "tg_last_car_raw": "[RL] Enus Benteygo"
+    },
+    "Laferari": {
+      "posts": 170,
+      "revenue": 2299207.0,
+      "last_price": 12999.0,
+      "last_posted_at": "2026-05-27 19:47:13",
+      "tg_events": 9,
+      "tg_revenue": 111487,
+      "tg_hours": 11,
+      "tg_last_renter": "Chieef Pink",
+      "tg_last_plate": "5HRX253",
+      "tg_last_car_raw": "[RL] Ubermacht i8"
+    },
+    "Fiction": {
+      "posts": 259,
+      "revenue": 1490471.05,
+      "last_price": 6666.0,
+      "last_posted_at": "2026-05-27 19:43:10",
+      "tg_events": 69,
+      "tg_revenue": 388647,
+      "tg_hours": 77,
+      "tg_last_renter": "Mitya Kolupaev",
+      "tg_last_plate": "5ADD624",
+      "tg_last_car_raw": "Western Deathbike Fiction"
+    },
+    "Lodka": {
+      "posts": 275,
+      "revenue": 1968063.0,
+      "last_price": 6999.0,
+      "last_posted_at": "2026-05-27 19:59:38",
+      "tg_events": 25,
+      "tg_revenue": 227199,
+      "tg_hours": 32,
+      "tg_last_renter": "Danny Benson",
+      "tg_last_plate": "5TEB055",
+      "tg_last_car_raw": "Pegassi Speeder RT"
+    },
+    "Mers": {
+      "posts": 254,
+      "revenue": 974342.0,
+      "last_price": 5999.0,
+      "last_posted_at": "2026-05-27 20:01:11",
+      "tg_events": 22,
+      "tg_revenue": 97639,
+      "tg_hours": 47,
+      "tg_last_renter": "Nikita Cloid",
+      "tg_last_plate": "7MZO",
+      "tg_last_car_raw": "[RL] Benefactor Runner"
+    },
+    "Vivo": {
+      "posts": 64,
+      "revenue": 1142801.0,
+      "last_price": 16535.0,
+      "last_posted_at": "2026-05-24 06:19:06",
+      "tg_events": 69,
+      "tg_revenue": 1382026,
+      "tg_hours": 84,
+      "tg_last_renter": "Leo Essex",
+      "tg_last_plate": "3IXA",
+      "tg_last_car_raw": "[RL] Truffade Vivo"
+    },
+    "Helion": {
+      "posts": 220,
+      "revenue": 790991.0,
+      "last_price": 3999.0,
+      "last_posted_at": "2026-05-27 19:45:51",
+      "tg_events": 38,
+      "tg_revenue": 147251,
+      "tg_hours": 46,
+      "tg_last_renter": "Oscar Hunter",
+      "tg_last_plate": "5TFN",
+      "tg_last_car_raw": "Annis Hellion XL"
+    },
+    "FordGT": {
+      "posts": 214,
+      "revenue": 2288194.0,
+      "last_price": 12999.0,
+      "last_posted_at": "2026-05-27 19:44:30",
+      "tg_events": 13,
+      "tg_revenue": 120860,
+      "tg_hours": 13,
+      "tg_last_renter": "Sonny Each",
+      "tg_last_plate": "5UYP",
+      "tg_last_car_raw": "[RL] Vapid GT"
+    },
+    "Drft": {
+      "posts": 298,
+      "revenue": 893702.0,
+      "last_price": 2999.0,
+      "last_posted_at": "2026-05-27 19:41:49"
+    },
+    "5": {
+      "posts": 317,
+      "revenue": 4874139.0,
+      "last_price": 15999.0,
+      "last_posted_at": "2026-05-27 22:30:40"
+    },
+    "1": {
+      "posts": 286,
+      "revenue": 3436024.0,
+      "last_price": 9999.0,
+      "last_posted_at": "2026-05-27 19:56:47"
+    },
+    "3": {
+      "posts": 253,
+      "revenue": 3736571.0,
+      "last_price": 14999.0,
+      "last_posted_at": "2026-05-27 21:55:04"
+    },
+    "2": {
+      "posts": 202,
+      "revenue": 1001021.0,
+      "last_price": 4796.0,
+      "last_posted_at": "2026-05-28 02:53:34"
+    }
+  }
+}

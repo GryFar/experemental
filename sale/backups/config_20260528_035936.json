@@ -211,7 +211,7 @@
   "vehicle_locate_fullscreen_on_miss": true,
   "vehicle_locate_fullscreen_tries": 2.0,
   "vehicle_region": null,
-  "vehicle_click_min": 0.75,
+  "vehicle_click_min": 0.78,
   "fast_scan_min_dist": 32,
   "fast_scan_parallel": true,
   "fast_scan_workers": 0,
@@ -324,9 +324,9 @@
   "bump_scroll_delay": 0.25,
   "fast_scan_compete_enabled": true,
   "fast_scan_compete_margin": 0.035,
-  "fast_scan_compete_w": 320,
-  "fast_scan_compete_h": 220,
-  "fast_scan_compete_min_best": 0.78,
+  "fast_scan_compete_w": 520,
+  "fast_scan_compete_h": 360,
+  "fast_scan_compete_min_best": 0.8,
   "vehicle_autoscroll_on_miss": false,
   "vehicle_autoscroll_steps": 10,
   "vehicle_autoscroll_pixels": 480,
@@ -379,8 +379,8 @@
       45
     ],
     "create_category": [
-      1047,
-      667
+      0,
+      0
     ],
     "create_rent": [
       780,
@@ -391,8 +391,8 @@
       0
     ],
     "comment": [
-      358,
-      603
+      380,
+      610
     ],
     "price": [
       675,

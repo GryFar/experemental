@@ -1,0 +1,127 @@
+{
+  "plates": {
+    "5HRX253": {
+      "car_key": "I8",
+      "car_raw": "[RL] Ubermacht i8",
+      "last_hourly": 5643.0,
+      "never_rent": false,
+      "updated_ts": 1767609254.0
+    },
+    "4HEQ": {
+      "car_key": "Raptor",
+      "car_raw": "[RL] Vapid F-150 Predator",
+      "last_hourly": 5700.0,
+      "never_rent": false,
+      "updated_ts": 1767689277.0
+    },
+    "3TDQ416": {
+      "car_key": "Fiction",
+      "car_raw": "Western Deathbike Fiction",
+      "last_hourly": 4750.0,
+      "never_rent": false,
+      "updated_ts": 1767705083.0
+    },
+    "0ODL": {
+      "car_key": "Shiron",
+      "car_raw": "[RL] Truffade Shiron",
+      "last_hourly": 11999.0,
+      "never_rent": false,
+      "updated_ts": 1767706972.0
+    },
+    "7MZO": {
+      "car_key": "Mers",
+      "car_raw": "[RL] Benefactor Runner",
+      "last_hourly": 1999.0,
+      "never_rent": false,
+      "updated_ts": 1767708290.0
+    },
+    "5TEB055": {
+      "car_key": "Lodka",
+      "car_raw": "Pegassi Speeder RT",
+      "last_hourly": 6800.0,
+      "never_rent": false,
+      "updated_ts": 1767707553.0
+    },
+    "9YQY524": {
+      "car_key": "Vert",
+      "car_raw": "Buckingham Volatus S",
+      "last_hourly": 14299.0,
+      "never_rent": false,
+      "updated_ts": 1767707922.0
+    },
+    "3WXK": {
+      "car_key": "Ram",
+      "car_raw": "[RL] Bravado RUM 1500",
+      "last_hourly": 4999.0,
+      "never_rent": false,
+      "updated_ts": 1767706448.0
+    },
+    "4TVT": {
+      "car_key": "Brottora",
+      "car_raw": "[RL] Pegassi Brutora",
+      "last_hourly": 5649.0,
+      "never_rent": false,
+      "updated_ts": 1767700467.0
+    },
+    "3IXA": {
+      "car_key": "Vivo",
+      "car_raw": "[RL] Truffade Vivo",
+      "last_hourly": 16720.0,
+      "never_rent": false,
+      "updated_ts": 1767608352.0
+    },
+    "8OMP": {
+      "car_key": "Shiron",
+      "car_raw": "[RL] Truffade Shiron",
+      "last_hourly": 11999.0,
+      "never_rent": false,
+      "updated_ts": 1767700077.0
+    },
+    "2DVC663": {
+      "car_key": "Cart",
+      "car_raw": "Dinka Veto Classic",
+      "last_hourly": 4328.0,
+      "never_rent": false,
+      "updated_ts": 1767587970.0
+    },
+    "7ALK": {
+      "car_key": "Betly",
+      "car_raw": "[RL] Enus Benteygo",
+      "last_hourly": 4999.0,
+      "never_rent": false,
+      "updated_ts": 1767704485.0
+    },
+    "5UYP": {
+      "car_key": "FordGT",
+      "car_raw": "[RL] Vapid GT",
+      "last_hourly": 8550.0,
+      "never_rent": false,
+      "updated_ts": 1767692362.0
+    },
+    "7QVQ": {
+      "car_key": "6x6",
+      "car_raw": "[RL] Benefactor G-Class W463 6x6",
+      "last_hourly": 13779.0,
+      "never_rent": false,
+      "updated_ts": 1767602614.0
+    },
+    "5HJJ": {
+      "car_key": "Laferari",
+      "car_raw": "[RL] Grotti LaGrotti",
+      "last_hourly": 12350.0,
+      "never_rent": false,
+      "updated_ts": 1767686289.0
+    },
+    "5TFN": {
+      "car_key": "Helion",
+      "car_raw": "Annis Hellion XL",
+      "last_hourly": 3800.0,
+      "never_rent": false,
+      "updated_ts": 1767609404.0
+    },
+    "0DMG298": {
+      "never_rent": true,
+      "updated_ts": 1767696879.9835594
+    }
+  }
+}
