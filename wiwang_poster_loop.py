@@ -3743,6 +3743,31 @@ def fast_scan_compete_check(cfg: Dict[str, Any], expected_stem: str, cx: int, cy
     return True, best_stem, best_score, expected_score
 
 
+_ANCHOR_QUALITY_CACHE: Dict[str, Tuple[float, float, float]] = {}
+
+
+def _check_anchor_quality(path: Path) -> Tuple[float, float]:
+    """Возвращает (std, mean) для якоря. Кэширует по mtime."""
+    if not path.exists() or np is None:
+        return 0.0, 0.0
+    try:
+        mt = float(path.stat().st_mtime)
+        cached = _ANCHOR_QUALITY_CACHE.get(str(path))
+        if cached and cached[0] == mt:
+            return cached[1], cached[2]
+        from PIL import Image as _PImg
+        img = _PImg.open(str(path)).convert("L")
+        arr = np.array(img)
+        if arr.size == 0:
+            return 0.0, 0.0
+        std_v = float(arr.std())
+        mean_v = float(arr.mean())
+        _ANCHOR_QUALITY_CACHE[str(path)] = (mt, std_v, mean_v)
+        return std_v, mean_v
+    except Exception:
+        return 0.0, 0.0
+
+
 def wait_for_form_ready(cfg: Dict[str, Any],
                         run_event: threading.Event, stop_event: threading.Event) -> bool:
     sleep_coop(d(cfg, "after_vehicle_click_delay", 2.8), run_event, stop_event)
@@ -3754,6 +3779,16 @@ def wait_for_form_ready(cfg: Dict[str, Any],
 
     if not ANCHOR_FORM_PATH.exists():
         return True
+
+    # Проверка качества якоря: если он «пустой» (низкий std),
+    # принимаем форму как реально готовую (fallback) вместо бессмысленного поиска.
+    try:
+        _std, _mean = _check_anchor_quality(ANCHOR_FORM_PATH)
+        if _std > 0 and _std < float(cfg.get("form_anchor_min_std", 15.0)):
+            log(f"FORM anchor LOW QUALITY (std={_std:.1f} < 15) -> skipping anchor check, treating form as ready")
+            return True
+    except Exception:
+        pass
 
     timeout = float(cfg.get("form_anchor_timeout", 8.0))
     poll = float(cfg.get("form_anchor_poll", 0.35)) / _speed(cfg)
@@ -11069,10 +11104,32 @@ class App(tk.Tk):
             y0 = max(0, y - h // 2)
             try:
                 img = pyautogui.screenshot(region=(x0, y0, w, h))
+                # Проверяем качество якоря: если пиксели однородные (низкий std) —
+                # locateOnScreen никогда не найдёт его надёжно. Предупреждаем юзера.
+                quality_warning = ""
+                try:
+                    if np is not None:
+                        arr = np.array(img.convert("L"))
+                        std_val = float(arr.std())
+                        mean_val = float(arr.mean())
+                        # Пустой якорь — очень низкий контраст (std<15) и тёмный фон (mean<40)
+                        if std_val < 15.0:
+                            quality_warning = (
+                                f"⚠ ЯКОРЬ НИЗКОГО КАЧЕСТВА!\n\n"
+                                f"Контраст (std)={std_val:.1f}, яркость={mean_val:.1f}\n"
+                                f"Нормальный якорь имеет std ≥ 30 (рельефный текст/иконка).\n\n"
+                                f"Этот якорь не будет надёжно находиться. Перезахвати с яркой надписии/иконки (напр. «Описание» или «Цена»)."
+                            )
+                            log(f"FORM anchor WARNING: low contrast std={std_val:.1f} mean={mean_val:.1f}")
+                except Exception:
+                    pass
                 img.save(str(ANCHOR_FORM_PATH))
                 log(f"Saved FORM anchor: {ANCHOR_FORM_PATH}")
                 self.anchor_status.set("OK")
-                messagebox.showinfo("Saved", f"Saved anchor:\n{ANCHOR_FORM_PATH}")
+                if quality_warning:
+                    messagebox.showwarning("Якорь низкого качества", quality_warning)
+                else:
+                    messagebox.showinfo("Saved", f"Saved anchor:\n{ANCHOR_FORM_PATH}")
             except Exception as e:
                 messagebox.showerror("Capture failed", str(e))
         self._run_capture_sequence("Capture FORM anchor", _apply, show_ui_before=False)
