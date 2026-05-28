@@ -3710,13 +3710,20 @@ def fast_scan_compete_check(cfg: Dict[str, Any], expected_stem: str, cx: int, cy
     if best_score < 0:
         best_score = 0.0
 
+    # КЛЮЧЕВОЕ: если лучший шаблон в этой области — именно наш (тот же stem),
+    # разрешаем клик безусловно. Даже если score низкий — никто остальной не лучше,
+    # значит в этой области реально наша машина (или пустая область — в обоих случаях
+    # клик безопасен).
+    if best_stem == expected_stem:
+        return True, best_stem, best_score, expected_score
+
     # Minimum expected match in the crop. If it's too low, reject to avoid "random" clicks.
     # NOTE: when using cache (no crop screenshot), scores are from full-screen matching
     # and are typically lower. Use a relaxed threshold for cache-based checks.
     try:
-        expected_min = float(cfg.get("fast_scan_compete_expected_min", max(0.70, float(_clamp_conf(cfg)) - 0.18)))
+        expected_min = float(cfg.get("fast_scan_compete_expected_min", max(0.55, float(_clamp_conf(cfg)) - 0.25)))
     except Exception:
-        expected_min = 0.73
+        expected_min = 0.55
 
     if expected_score < expected_min:
         return False, best_stem, best_score, expected_score
