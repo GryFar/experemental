@@ -2,11 +2,95 @@ import json
 import os
 import re
 import shutil
+import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 _MAX_BACKUPS = 20
+_LOCK_TIMEOUT_S = 5.0  # макс время ожидания файлового лока
+_LOCK_POLL_S = 0.05
+
+
+@contextmanager
+def _file_lock(path: Path, log_fn: Optional[Callable[[str], None]] = None):
+    """Межпроцессный лок на базе .lock-файла рядом с config.json.
+
+    Необходим из-за двухпроцессной архитектуры (GUI + Admin), когда оба пишут в один файл.
+    Использует msvcrt.locking на Windows / fcntl.flock на POSIX. Без внешних зависимостей.
+    """
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    fh = None
+    locked = False
+    is_win = sys.platform.startswith("win")
+    try:
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        fh = open(str(lock_path), "a+b")
+        if is_win:
+            try:
+                import msvcrt  # type: ignore
+                deadline = time.time() + _LOCK_TIMEOUT_S
+                while True:
+                    try:
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                        locked = True
+                        break
+                    except OSError:
+                        if time.time() > deadline:
+                            break
+                        time.sleep(_LOCK_POLL_S)
+            except Exception:
+                locked = False
+        else:
+            try:
+                import fcntl  # type: ignore
+                deadline = time.time() + _LOCK_TIMEOUT_S
+                while True:
+                    try:
+                        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        locked = True
+                        break
+                    except OSError:
+                        if time.time() > deadline:
+                            break
+                        time.sleep(_LOCK_POLL_S)
+            except Exception:
+                locked = False
+        if not locked and log_fn:
+            try:
+                log_fn(f"CONFIG: lock not acquired ({_LOCK_TIMEOUT_S}s), proceeding without lock")
+            except Exception:
+                pass
+        yield locked
+    finally:
+        if fh is not None:
+            try:
+                if locked:
+                    if is_win:
+                        try:
+                            import msvcrt  # type: ignore
+                            try:
+                                fh.seek(0)
+                            except Exception:
+                                pass
+                            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            import fcntl  # type: ignore
+                            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                        except Exception:
+                            pass
+            finally:
+                try:
+                    fh.close()
+                except Exception:
+                    pass
 
 
 def load_config(path: Path, log_fn: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
@@ -119,26 +203,35 @@ def save_config_preserve(
                 pass
 
     _log(f"CONFIG: save request -> {path}")
-    old_cfg = load_config(path, log_fn=log_fn)
-    before = len(old_cfg.keys()) if isinstance(old_cfg, dict) else 0
-    if changed_keys:
-        _log(f"CONFIG: changed_keys={sorted(changed_keys)}")
-    merged = deep_merge(
-        old_cfg,
-        cfg_updates,
-        changed_keys=changed_keys,
-        allow_empty_lists=allow_empty_lists,
-    )
-    after = len(merged.keys()) if isinstance(merged, dict) else 0
+    with _file_lock(path, log_fn=_log):
+        # Под локом: перечитать свежий конфиг (вдруг второй процесс писал),
+        # смерджить и записать — одной атомарной операцией.
+        old_cfg = load_config(path, log_fn=log_fn)
+        before = len(old_cfg.keys()) if isinstance(old_cfg, dict) else 0
+        if changed_keys:
+            _log(f"CONFIG: changed_keys={sorted(changed_keys)}")
+        merged = deep_merge(
+            old_cfg,
+            cfg_updates,
+            changed_keys=changed_keys,
+            allow_empty_lists=allow_empty_lists,
+        )
+        after = len(merged.keys()) if isinstance(merged, dict) else 0
 
-    if after < before:
-        _log(f"CONFIG ERROR: key loss detected, abort saving (before={before}, after={after})")
-        return False, before, after
+        if after < before:
+            _log(f"CONFIG ERROR: key loss detected, abort saving (before={before}, after={after})")
+            return False, before, after
 
-    _backup_versioned(path, log_fn=_log)
-    _atomic_write(path, merged)
-    _log(f"CONFIG: saved ok keys={after} (before={before})")
-    return True, before, after
+        # No-op защита: если ничего не поменялось — не пишем и не делаем backup.
+        # Это резко снижает спам в логах и ротацию бэкапов.
+        if merged == old_cfg:
+            _log(f"CONFIG: no-op (no changes) keys={after}")
+            return True, before, after
+
+        _backup_versioned(path, log_fn=_log)
+        _atomic_write(path, merged)
+        _log(f"CONFIG: saved ok keys={after} (before={before})")
+        return True, before, after
 
 
 def detect_keys(cfg: Dict[str, Any]) -> Dict[str, Any]:
