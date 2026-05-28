@@ -210,12 +210,27 @@ def save_config_preserve(
         before = len(old_cfg.keys()) if isinstance(old_cfg, dict) else 0
         if changed_keys:
             _log(f"CONFIG: changed_keys={sorted(changed_keys)}")
-        merged = deep_merge(
-            old_cfg,
-            cfg_updates,
-            changed_keys=changed_keys,
-            allow_empty_lists=allow_empty_lists,
-        )
+
+        # КЛЮЧЕВАЯ ЗАЩИТА ОТ RACE МЕЖДУ ПРОЦЕССАМИ:
+        # Если процесс точно знает какие ключи он менял (changed_keys задан),
+        # берём из его памяти ТОЛЬКО эти ключи, всё остальное — из свежего файла.
+        # Так второй процесс не затрёт telegram/bump_points/etc. первого.
+        if changed_keys:
+            base = dict(old_cfg) if isinstance(old_cfg, dict) else {}
+            if isinstance(cfg_updates, dict):
+                for k in changed_keys:
+                    if k in cfg_updates:
+                        base[k] = cfg_updates[k]
+                    # если ключа нет в cfg_updates — оставляем как в файле (не трогаем)
+            merged = base
+        else:
+            # Старый путь: полный мердж (используется при первом сохранении дефолтов и т.п.).
+            merged = deep_merge(
+                old_cfg,
+                cfg_updates,
+                changed_keys=changed_keys,
+                allow_empty_lists=allow_empty_lists,
+            )
         after = len(merged.keys()) if isinstance(merged, dict) else 0
 
         if after < before:

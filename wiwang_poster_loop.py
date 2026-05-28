@@ -7064,10 +7064,15 @@ class App(tk.Tk):
                 _configure_runtime_env(self.cfg)
             except Exception:
                 pass
+        # Аккумулируем изменённые ключи между debounce'ами — не терять предыдущие.
+        # Это ключевое для двухпроцессной архитектуры: при save мы пошлём
+        # только эти ключи, всё остальное возьмётся из свежего файла (чтобы не затереть
+        # изменения второго процесса, напр. телеграм-креды или bump_points).
         try:
-            self._last_cfg_patch_keys = set(patch.keys())
+            prev = getattr(self, "_last_cfg_patch_keys", None) or set()
+            self._last_cfg_patch_keys = set(prev) | set(patch.keys())
         except Exception:
-            self._last_cfg_patch_keys = None
+            self._last_cfg_patch_keys = set(patch.keys())
         self._debounced_save()
 
     def _apply_cfg_patch_with_keys(self, patch: Dict[str, Any], changed_keys: Optional[Set[str]]) -> None:
@@ -7080,9 +7085,11 @@ class App(tk.Tk):
             _DEBUG_SLOW["enabled"] = bool(self.cfg.get("debug_slow_mode", False))
             _DEBUG_SLOW["delay"] = float(self.cfg.get("debug_slow_delay", 1.5))
         try:
-            self._last_cfg_patch_keys = set(changed_keys or [])
+            prev = getattr(self, "_last_cfg_patch_keys", None) or set()
+            new_keys = set(changed_keys) if changed_keys else set(patch.keys())
+            self._last_cfg_patch_keys = set(prev) | new_keys
         except Exception:
-            self._last_cfg_patch_keys = None
+            self._last_cfg_patch_keys = set(changed_keys or patch.keys())
         self._debounced_save()
 
     def _debounced_save(self, ms: int = 260) -> None:
