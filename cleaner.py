@@ -36,8 +36,6 @@ cleaner.py — автоочистка мусора: логи, скриншоты
 """
 from __future__ import annotations
 
-import os
-import glob
 import re
 import shutil
 import time

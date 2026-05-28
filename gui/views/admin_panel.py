@@ -21,11 +21,8 @@ class AdminPanel(ttk.Frame):
         _bg     = self._colors.get("bg",     "#1a1a2e")
         _panel  = self._colors.get("panel",  "#16213e")
         _fg     = self._colors.get("fg",     "#d4d4dc")
-        _muted  = self._colors.get("muted",  "#7a7a8e")
         _accent = self._colors.get("accent", "#4a6fa5")
         _border = self._colors.get("border", "#2a2a4a")
-        _danger = self._colors.get("danger", "#c0544e")
-        _success = self._colors.get("success", "#4caf7c")
 
         self.scroll = ScrollFrame(self, colors=self._colors)
         self.scroll.pack(fill="both", expand=True)

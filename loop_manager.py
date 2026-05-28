@@ -5,7 +5,7 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 
 
 @dataclass

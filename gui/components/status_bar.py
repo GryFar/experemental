@@ -6,10 +6,7 @@ class StatusBar(tk.Frame):
     def __init__(self, parent, *, colors: Optional[Dict[str, str]] = None) -> None:
         self._colors = colors or {}
         bg = self._colors.get("panel", "#16213e")
-        accent = self._colors.get("accent", "#4a6fa5")
-        border = self._colors.get("border", "#2a2a4a")
         muted = self._colors.get("muted", "#7a7a8e")
-        fg = self._colors.get("fg", "#d4d4dc")
         super().__init__(
             parent,
             bg=bg,

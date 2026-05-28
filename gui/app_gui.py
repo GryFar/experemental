@@ -1,9 +1,9 @@
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 
 from gui.auth.admin_gate import AdminGate
 from gui.persistence.ui_prefs import load_ui_prefs, save_ui_prefs
@@ -131,7 +131,6 @@ class AppGUI:
         _fg      = self.colors["fg"]
         _muted   = self.colors.get("muted", "#7a7a8e")
         _accent  = self.colors["accent"]
-        _accent2 = self.colors.get("accent2", "#5b8a72")
         _danger  = self.colors.get("danger", "#c0544e")
         _border  = self.colors["border"]
         _btn     = self.colors.get("btn", _panel)

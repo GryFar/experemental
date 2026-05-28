@@ -918,11 +918,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "ui_delay_medium": 0.70,
     "ui_delay_long": 1.40,
     "after_vehicle_click_delay": 2.8,
-    "vehicle_click_confirm_enabled": True,
-    "vehicle_click_confirm_skip_if_form_ready": True,
-    "vehicle_click_confirm_check_retries": 3,
-    "vehicle_click_confirm_check_delay": 0.06,
-    "vehicle_click_confirm_disabled_stems": [],
     # anchor
     "form_anchor_enabled": True,
     "form_anchor_timeout": 8.0,
@@ -934,13 +929,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "vehicle_list_ready_cache_max_age": 1.2,
     "vehicle_list_ready_sample": 6,
     "vehicle_list_ready_initial_delay": 1.6,
-    "post_ok_wait_vehicle_list": True,
     "post_ok_after_create_rent_delay": 1.2,
     "vehicle_list_ready_force_refresh": True,
     # typing
     "type_char_delay": 0.02,
     "type_line_delay": 0.06,
-    "type_fallback_clipboard_punct": True,  # paste punctuation in fallback to avoid layout swapping (e.g., '.' -> 'ю')
     "use_clipboard_paste": False,
     # NEW: safest mode regarding RU/EN
     "ignore_keyboard_layout": True,
@@ -975,7 +968,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "file_dialog_reuse_folder": True,
     "file_dialog_reuse_delay": 0.18,
     "file_dialog_after_click_path": 0.90,
-    "file_dialog_path_focus_delay": 0.12,
     "file_dialog_force_click_type_path": True,  # focus by clicks and type path (no clipboard)
     "file_dialog_clicks_before_type": 2,
     "file_dialog_after_clear_path": 0.25,
@@ -1012,9 +1004,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "file_dialog_clipboard_retries": 2,
     "file_dialog_allow_fallback_typing": False,  # allow layout-sensitive typing if clipboard fails
     "file_dialog_retry_clipboard_on_verify_fail": True,
-    "file_dialog_clear_before_paste": True,  # clear address bar before clipboard paste
-    "file_dialog_paste_use_ctrl_l": True,  # focus address bar with Ctrl+L before paste
-    "file_dialog_paste_force_ctrl_v": True,  # always use Ctrl+V for dialog paste
     "file_dialog_use_filename_field": False,  # avoid filename field hotkeys
     "file_dialog_filename_first_only": True,
     "file_dialog_filename_skip_navigate": True,
@@ -1041,10 +1030,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "file_dialog_force_paste_no_verify": False,  # avoid Ctrl+V path paste
     "file_dialog_select_path_clicks": 2,  # extra clicks to ensure address bar focus before paste
     "file_dialog_force_latin_layout": True,  # switch to Latin layout before typing ASCII path
-    "file_dialog_type_char_delay": 0.05,
     "file_dialog_save_debug": True,  # save screenshot when path verification fails/unavailable
     "file_dialog_debug_dir": None,  # directory for dialog debug screenshots
-    "file_dialog_use_f4_focus": False,  # avoid hotkey focus
     "file_dialog_verify_on_reuse": True,  # verify dialog path when reusing folder
     "file_dialog_force_navigate_on_unknown": True,  # navigate if path verify unavailable
     # posting interval
@@ -1059,7 +1046,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "cycle_sleep": 0.8,
     # start nudge
     "start_nudge_enabled": True,
-    "start_nudge_click": True,
     "start_nudge_move_duration": 0.18,
     "start_nudge_delay": 0.10,
     # Auto-bump "My Ads"
@@ -1095,11 +1081,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "fast_scan_pre_sweep_enabled": True,  # scan ALL templates in one screenshot at sweep start
     "fast_scan_template_bg_gray": 30,
     "fast_scan_alpha_mask_thr": 10,
-    "fast_scan_edge_enabled": True,
-    "fast_scan_edge_low": 50,
-    "fast_scan_edge_high": 150,
-    "fast_scan_edge_aperture": 3,
-    "fast_scan_edge_l2": True,
     "vehicle_region_expand_down": 520,
     "vehicle_region_expand_up": 0,
     "fast_scan_multiscale": True,
@@ -1137,7 +1118,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "plate_read_attempts": 2,
     "plate_read_retry_delay": 0.35,
     "plate_read_prompt_on_fail": True,
-    "plate_read_min_confidence": None,
     "plate_read_ocr_scale": 3,
     "plate_read_ocr_pad": 2,
     "plate_read_psm_list": ["7", "6"],
@@ -1525,28 +1505,6 @@ def append_price_decision_row(
             w.writerow(row)
     except Exception as e:
         log(f"price_decisions write error: {e}")
-
-def choose_price_with_schedule(folder: Path, base_raw: str, base_value: float) -> Tuple[str, float, str, str, str, float, datetime]:
-    """
-    Returns:
-      chosen_raw, chosen_value, mode, daytype, slot, mult, dt_msk
-    """
-    sched = load_schedule(folder)
-    mode = str(sched.get("mode", "manual")).strip().lower()
-    now_msk = datetime.now(tz=MSK_TZ)
-    daytype = msk_daytype(now_msk)
-    slot = msk_slot(now_msk)
-    mult = 1.0
-    if mode in ("schedule", "auto_suggest"):
-        try:
-            mult = float(sched.get(daytype, {}).get(slot, 1.0))
-        except Exception:
-            mult = 1.0
-    chosen_value = float(base_value) * float(mult)
-    chosen_value_rounded = round(chosen_value)
-    chosen_raw = str(int(chosen_value_rounded))
-    return chosen_raw, float(chosen_value_rounded), mode, daytype, slot, float(mult), now_msk
-
 
 # ---------------- UI: tooltips ----------------
 class Tooltip:
@@ -3649,29 +3607,6 @@ def _read_image_gray_with_mask(path: str,
     except Exception:
         return None, None
 
-def _tmpl_gray_cached(path: Path) -> Optional["np.ndarray"]:
-    try:
-        p = str(path)
-        mtime = float(path.stat().st_mtime)
-    except Exception:
-        return None
-    try:
-        with _TEMPLATE_IMG_LOCK:
-            rec = _TEMPLATE_IMG_CACHE.get(p)
-        if rec and (float(rec[0]) == mtime) and rec[1] is not None:
-            return rec[1]
-    except Exception:
-        pass
-    try:
-        arr = _read_image_gray(p)
-        if arr is None:
-            return None
-        with _TEMPLATE_IMG_LOCK:
-            _TEMPLATE_IMG_CACHE[p] = (mtime, arr, None, False)
-        return arr
-    except Exception:
-        return None
-
 
 def _tmpl_gray_mask_cached(path: Path, cfg: Dict[str, Any]) -> Tuple[Optional["np.ndarray"], Optional["np.ndarray"]]:
     try:
@@ -3799,36 +3734,6 @@ def fast_scan_compete_check(cfg: Dict[str, Any], expected_stem: str, cx: int, cy
     if best_stem != expected_stem and (best_score >= min_best) and ((best_score - expected_score) >= margin):
         return False, best_stem, best_score, expected_score
     return True, best_stem, best_score, expected_score
-
-
-def is_form_ready_quick(cfg: Dict[str, Any]) -> bool:
-    if pyautogui is None:
-        return False
-    if not cfg.get("form_anchor_enabled", True):
-        return False
-    if not ANCHOR_FORM_PATH.exists():
-        return False
-    try:
-        base_conf = float(cfg.get("form_anchor_conf", min(float(cfg.get("confidence", 0.94)), 0.90)))
-    except Exception:
-        base_conf = 0.94
-    confs = [base_conf, max(0.70, base_conf - 0.04), max(0.70, base_conf - 0.08)]
-    try:
-        grays = [bool(cfg.get("grayscale", True)), False]
-    except Exception:
-        grays = [True, False]
-    try:
-        for conf_try in confs:
-            for gray_try in grays:
-                if bool(cfg.get("use_confidence", True)) and HAS_OPENCV:
-                    box = pyautogui.locateOnScreen(str(ANCHOR_FORM_PATH), confidence=conf_try, grayscale=gray_try)
-                else:
-                    box = pyautogui.locateOnScreen(str(ANCHOR_FORM_PATH), grayscale=gray_try)
-                if box:
-                    return True
-        return False
-    except Exception:
-        return False
 
 
 def wait_for_form_ready(cfg: Dict[str, Any],
@@ -4139,50 +4044,6 @@ class _GuiThreadInfo(ctypes.Structure):
         ("hwndCaret", ctypes.wintypes.HWND),
         ("rcCaret", ctypes.wintypes.RECT),
     ]
-
-
-def _win_get_focus_hwnd() -> Optional[int]:
-    if not sys.platform.startswith("win"):
-        return None
-    try:
-        user32 = ctypes.windll.user32
-        hwnd_fg = user32.GetForegroundWindow()
-        if not hwnd_fg:
-            return None
-        pid = ctypes.c_uint()
-        tid = user32.GetWindowThreadProcessId(hwnd_fg, ctypes.byref(pid))
-        info = _GuiThreadInfo()
-        info.cbSize = ctypes.sizeof(_GuiThreadInfo)
-        if user32.GetGUIThreadInfo(tid, ctypes.byref(info)):
-            return int(info.hwndFocus or info.hwndActive or hwnd_fg)
-        return int(hwnd_fg)
-    except Exception:
-        return None
-
-
-def _win_get_text(hwnd: Optional[int]) -> str:
-    if not hwnd or not sys.platform.startswith("win"):
-        return ""
-    try:
-        user32 = ctypes.windll.user32
-        length = user32.GetWindowTextLengthW(hwnd)
-        buf = ctypes.create_unicode_buffer(max(1, int(length) + 1))
-        user32.GetWindowTextW(hwnd, buf, len(buf))
-        return buf.value or ""
-    except Exception:
-        return ""
-
-
-def _win_set_text(hwnd: Optional[int], text: str) -> bool:
-    if not hwnd or not sys.platform.startswith("win"):
-        return False
-    try:
-        user32 = ctypes.windll.user32
-        WM_SETTEXT = 0x000C
-        user32.SendMessageW(hwnd, WM_SETTEXT, 0, text)
-        return True
-    except Exception:
-        return False
 
 
 def _is_probably_file_dialog(cls: str, title: str) -> bool:
@@ -4991,25 +4852,6 @@ PLATE_LAST: Dict[str, Any] = {
     "ref_path": None,
     "live_pil": None,
 }
-
-def _vehicle_settings_path(folder: Path) -> Path:
-    return folder / "schedule.json"
-
-def _load_vehicle_settings(folder: Path) -> Dict[str, Any]:
-    p = _vehicle_settings_path(folder)
-    if not p.exists():
-        return {}
-    try:
-        return json.loads(p.read_text(encoding="utf-8", errors="ignore") or "{}")
-    except Exception:
-        return {}
-
-def _plate_ref_path(folder: Path, vs: Dict[str, Any]) -> Optional[Path]:
-    # allow custom ref filename later
-    cand = vs.get("plate_ref") or "plate_ref.png"
-    p = folder / cand
-    return p if p.exists() else None
-
 
 def _grab_plate_live(cfg: Dict[str, Any]):
     """Grab a WIDE plate line region (should include 'Гос.Номер:' + the value).
@@ -8583,25 +8425,6 @@ class App(tk.Tk):
                     return None
             return out
 
-        def row_float_list(parent, title, key):
-            r = tk.Frame(parent, bg=self.colors["panel"])
-            r.pack(fill="x", padx=12, pady=7)
-            self._label(r, title, bold=True).pack(side="left")
-            var = tk.StringVar(value=_format_list(cfg.get(key, [])))
-            ent = ttk.Entry(r, textvariable=var, width=36)
-            ent.pack(side="left", fill="x", expand=True, padx=12)
-
-            def _apply(*_):
-                parsed = _parse_float_list(var.get())
-                if parsed is None:
-                    var.set(_format_list(self.cfg_provider().get(key, [])))
-                    return
-                self._apply_cfg_patch({key: parsed})
-
-            ent.bind("<FocusOut>", _apply, add="+")
-            ent.bind("<Return>", _apply, add="+")
-            return var
-
         # ── SECTION: Behavior ─────────────────────────────────────────────────
         sec_behavior = self._make_section_frame(inner, "📋 ПОВЕДЕНИЕ  —  режим работы бота")
         row_bool(sec_behavior, "Бесконечный цикл  (loop_mode: авторазмещение без остановки)", "loop_mode")
@@ -11379,23 +11202,6 @@ class App(tk.Tk):
         except Exception:
             return ""
 
-    def _format_pop_delta(cur_val: float, prev_val: float):
-        """
-        Returns (display_str, numeric_for_sort).
-        """
-        try:
-            cur_val = float(cur_val)
-            prev_val = float(prev_val)
-            if prev_val <= 0.0:
-                if cur_val <= 0.0:
-                    return "0%", 0.0
-                return "NEW", 9_999_999.0
-            delta = (cur_val - prev_val) / prev_val * 100.0
-            # Keep it readable: integer %
-            return f"{delta:+.0f}%", float(delta)
-        except Exception:
-            return "—", -9_999_999.0
-
     def _on_stats_heading_click(self, col: str) -> None:
         # Clicking a column header sets sort key; clicking again toggles ASC/DESC.
         try:
@@ -13133,25 +12939,6 @@ def _redraw_inline_charts(self):
 # It attaches a safe __getattr__ and minimal _setup_window, plus a few common callbacks.
 import tkinter as _tk
 
-def _no_op_factory(name):
-    def _no_op(*args, **kwargs):
-        try:
-            # best-effort log to console area if present
-            msg = f"[WARN] Missing callback executed: {name}"
-            for attr in ("txt_logs","log_text","logs_text","txt_log","console_text","txt_console"):
-                w = getattr(args[0], attr, None) if args else None
-                if w is not None:
-                    try:
-                        w.insert("end", msg + "\n")
-                        w.see("end")
-                        break
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        return None
-    return _no_op
-
 def _app___getattr__(self, name):
     """
     Safety net for missing callbacks in mixed/merged builds.
@@ -13660,27 +13447,6 @@ def _pulse_tick(self):
 # --- Bind module-level UI helper functions into App (fix indentation/merge issues) ---
 
 
-# ---------- Editor typing guards (prevents live refresh from overwriting input) ----------
-def _set_editor_typing(self, on: bool = True):
-    try:
-        self._editor_is_typing = bool(on)
-        self._editor_last_typing_ts = time.time()
-    except Exception:
-        pass
-
-def _bump_editor_typing(self):
-    try:
-        self._editor_is_typing = True
-        self._editor_last_typing_ts = time.time()
-    except Exception:
-        pass
-
-def _mark_editor_dirty(self):
-    try:
-        self._editor_dirty = True
-    except Exception:
-        pass
-
 try:
     for _name in [
         '_build_editor_ui',
@@ -13698,10 +13464,7 @@ try:
         '_export_suggestions_csv',
         '_update_multiplier_previews',
         '_pulse_tick',
-        '_redraw_inline_charts',
-        '_set_editor_typing',
-        '_bump_editor_typing',
-        '_mark_editor_dirty']:
+        '_redraw_inline_charts']:
         if _name in globals() and not hasattr(App, _name):
             setattr(App, _name, globals()[_name])
 except Exception:
